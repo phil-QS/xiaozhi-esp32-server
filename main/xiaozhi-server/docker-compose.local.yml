@@ -1,0 +1,44 @@
+# 本地部署：仅 xiaozhi-server + manager-web/manager-api
+# 使用宿主机或已有 Docker 容器中的 MySQL / Redis（不包含 db/redis 服务）
+#
+# 使用前：
+#   1. cp .env.local.example .env 并按本机 MySQL/Redis 修改
+#   2. 在项目根目录执行 ./docker-build-local.sh 构建镜像
+#   3. docker compose -f docker-compose.local.yml up -d
+
+services:
+  xiaozhi-esp32-server:
+    image: ${DOCKER_IMAGE_SERVER:-xiaozhi-local/xiaozhi-esp32-server:latest}
+    container_name: xiaozhi-esp32-server
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${SERVER_WS_PORT:-8000}:8000"
+      - "${SERVER_HTTP_PORT:-8003}:8003"
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ./data:/opt/xiaozhi-esp32-server/data
+      - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
+
+  xiaozhi-esp32-server-web:
+    image: ${DOCKER_IMAGE_WEB:-xiaozhi-local/xiaozhi-esp32-server-web:latest}
+    container_name: xiaozhi-esp32-server-web
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${WEB_PORT:-8002}:8002"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SPRING_DATASOURCE_DRUID_URL: jdbc:mysql://${MYSQL_HOST:-host.docker.internal}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-xiaozhi_esp32_server}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&connectTimeout=30000&socketTimeout=30000&autoReconnect=true&failOverReadOnly=false&maxReconnects=10
+      SPRING_DATASOURCE_DRUID_USERNAME: ${MYSQL_USER:-root}
+      SPRING_DATASOURCE_DRUID_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - ./uploadfile:/uploadfile
